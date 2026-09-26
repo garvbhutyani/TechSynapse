@@ -54,12 +54,8 @@
     --line: rgba(244,243,250,0.10);
   }
   html{ background:var(--bg); }
-  body{ background:transparent; }
+  body{ background:var(--bg); }
   ::selection{ background:var(--violet); color:#fff; }
-
-  /* Site-wide starfield canvas — fixed behind everything, z:-1 clears it under the
-     (transparent) body box so it reads through every section that has no own bg */
-  #space-bg{ position:fixed; inset:0; z-index:-1; pointer-events:none; display:block; }
 
   /* Preloader */
   #preloader{ position:fixed; inset:0; z-index:9999; background:var(--bg);
@@ -85,37 +81,25 @@
   .cursor-active, .cursor-active *{ cursor:none !important; }
   #cursor-fx{ position:fixed; inset:0; pointer-events:none; z-index:99999; display:block; }
 
+  /* Whole-page cosmic backdrop: fixed behind every section, first in source order
+     so ordinary positioned content (all sections use position:relative) paints over it. */
+  #bg-cosmos{ position:fixed; inset:0; width:100%; height:100%; pointer-events:none; display:block; }
+
   /* Reveal-on-scroll baseline (JS overrides via inline styles; this is just a light hint) */
   .no-js-fallback .reveal{ opacity:1 !important; transform:none !important; }
 
   /* Hairlines */
   .hairline{ border:1px solid var(--line); }
 
-  /* Glow orbs for parallax depth — GSAP scrub already drives their translateY, so the
-     ambient "nonstop" motion here only touches opacity to avoid fighting that transform */
-  .orb{ position:absolute; border-radius:9999px; filter:blur(90px); pointer-events:none; z-index:0;
-    animation: orbPulse 9s ease-in-out infinite; }
-  @keyframes orbPulse{ 0%,100%{ opacity:.7; } 50%{ opacity:1; } }
-
-  /* Hero wordmark: a slow light-sweep across the gradient text for a premium sheen */
-  .wordmark-reveal p{
-    background: linear-gradient(100deg, #F4F3FA 30%, #7C5CFF 45%, #45E8D1 50%, #F4F3FA 65%);
-    background-size: 250% 100%;
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    animation: shimmer 7s linear infinite;
-  }
-  @keyframes shimmer{ 0%{ background-position: 200% 0; } 100%{ background-position: -50% 0; } }
+  /* Glow orbs for parallax depth */
+  .orb{ position:absolute; border-radius:9999px; filter:blur(90px); pointer-events:none; z-index:0; }
 
   /* Magnetic buttons */
   [data-magnetic]{ display:inline-flex; will-change:transform; }
   [data-magnetic] .mag-inner{ display:inline-flex; will-change:transform; }
 
-  /* Tilt cards — hover uses inline transforms via GSAP, so the idle animation here
-     only touches box-shadow (never transform) to avoid fighting that */
-  .tilt-card{ transform-style:preserve-3d; will-change:transform; animation: cardGlow 6s ease-in-out infinite; }
-  .tilt-card:nth-child(2){ animation-delay: 1.5s; }
-  .tilt-card:nth-child(3){ animation-delay: 3s; }
-  @keyframes cardGlow{ 0%,100%{ box-shadow: 0 0 0 rgba(124,92,255,0); } 50%{ box-shadow: 0 0 42px rgba(124,92,255,0.10); } }
+  /* Tilt cards */
+  .tilt-card{ transform-style:preserve-3d; will-change:transform; }
   .tilt-card .tilt-glow{ opacity:0; transition:opacity .35s ease; }
   .tilt-card:hover .tilt-glow{ opacity:1; }
 
@@ -132,14 +116,16 @@
   ::-webkit-scrollbar-thumb{ background:#242c4d; border-radius:9999px; }
 
   @media (prefers-reduced-motion: reduce){
-    .wordmark-reveal,.hero-tagline,.hero-sub,.hero-cta,.reveal{ opacity:1 !important; transform:none !important; filter:none !important; }
+    .wordmark-reveal,.hero-tagline,.hero-sub,.hero-cta,.reveal{ opacity:1 !important; transform:none !important; }
     #preloader{ display:none !important; }
-    .orb, .tilt-card, .wordmark-reveal p{ animation:none !important; }
   }
 </style>
 </head>
 
-<body class="text-ink font-body antialiased overflow-x-hidden selection:bg-violet">
+<body class="bg-bg text-ink font-body antialiased overflow-x-hidden selection:bg-violet">
+
+<!-- Persistent whole-page cosmic backdrop: ambient stars + falling satellites, fixed behind everything -->
+<canvas id="bg-cosmos" aria-hidden="true"></canvas>
 
 <!-- ============ PRELOADER ============ -->
 <div id="preloader" aria-hidden="true">
@@ -149,9 +135,6 @@
     </span>
   </div>
 </div>
-
-<!-- Persistent full-page starfield + satellites, sits behind every section -->
-<canvas id="space-bg" aria-hidden="true"></canvas>
 
 <!-- Custom "sun" cursor + flame trail (desktop/mouse only, see script at bottom) -->
 <canvas id="cursor-fx" aria-hidden="true"></canvas>
@@ -319,7 +302,7 @@
   </section>
 
   <!-- ============ FOUNDER NOTE ============ -->
-  <section class="relative py-28 md:py-36 border-t border-line bg-surface/85 overflow-hidden">
+  <section class="relative py-28 md:py-36 border-t border-line bg-surface/60 overflow-hidden">
     <svg class="absolute -top-10 -left-10 opacity-[0.06] pointer-events-none" width="360" height="360" viewBox="0 0 100 100" fill="none">
       <path d="M20 30 Q20 15 35 15 Q50 15 50 30 Q50 42 38 46 L38 55" stroke="#F4F3FA" stroke-width="4" stroke-linecap="round"/>
     </svg>
@@ -436,39 +419,23 @@ if (!hasGSAP || prefersReduced) {
     if (window.startGravity) window.startGravity();
   }
 
-  // ---------- Scroll-triggered reveals (fade + rise + a soft focus-pull from blur) ----------
+  // ---------- Scroll-triggered reveals ----------
   gsap.utils.toArray('.reveal').forEach(function(el){
-    gsap.fromTo(el, { opacity: 0, y: 36, filter: 'blur(6px)' }, {
-      opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power3.out',
+    gsap.fromTo(el, { opacity: 0, y: 36 }, {
+      opacity: 1, y: 0, duration: 0.9, ease: 'power3.out',
       scrollTrigger: { trigger: el, start: 'top 87%', toggleActions: 'play none none none' }
     });
   });
 
-  // ---------- Hand Jupiter's star-swarm off to the page-wide starfield ----------
-  // Fires as the hero finishes scrolling past — the stars that were orbiting Jupiter
-  // fly outward from its last on-screen position and settle into the details section.
-  if (typeof ScrollTrigger !== 'undefined'){
-    ScrollTrigger.create({
-      trigger: '#hero',
-      start: 'bottom 85%',
-      onEnter: function(){
-        if (window.releaseHeroStars && window.getJupiterScreenPos){
-          var p = window.getJupiterScreenPos();
-          window.releaseHeroStars(p.x, p.y);
-        }
-      }
-    });
-  }
-
   // Card stagger (slightly nicer than one-by-one on identical trigger points)
-  gsap.fromTo('#cards-grid .tilt-card', { opacity: 0, y: 36, filter: 'blur(6px)' }, {
-    opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power3.out', stagger: 0.12,
+  gsap.fromTo('#cards-grid .tilt-card', { opacity: 0, y: 36 }, {
+    opacity: 1, y: 0, duration: 0.9, ease: 'power3.out', stagger: 0.12,
     scrollTrigger: { trigger: '#cards-grid', start: 'top 85%' }
   });
 
   // After-service staggered list
-  gsap.fromTo('.after-item', { opacity: 0, y: 28, filter: 'blur(4px)' }, {
-    opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.8, ease: 'power3.out', stagger: 0.18,
+  gsap.fromTo('.after-item', { opacity: 0, y: 28 }, {
+    opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', stagger: 0.18,
     scrollTrigger: { trigger: '#after-list', start: 'top 80%' }
   });
 
@@ -541,6 +508,15 @@ if (!hasGSAP || prefersReduced) {
   var canAnimate = !reduced && typeof gsap !== 'undefined';
   var progress = canAnimate ? 0 : 1; // 0 = scattered everywhere, 1 = pulled in near Jupiter
   var planet = { cx: 0, cy: 0, r: 0 };
+
+  // Optional real-photo upgrade: drop a properly licensed Jupiter photo in the same
+  // folder as this file, named jupiter-real.jpg, and it's used automatically in place
+  // of the procedural bands below. No file there yet? This 404s harmlessly and the
+  // procedural version keeps running — nothing else to configure.
+  var realTexture = new Image();
+  var realTextureReady = false;
+  realTexture.onload = function(){ realTextureReady = true; };
+  realTexture.src = 'jupiter-real.jpg';
   var start = performance.now();
 
   // Real Jupiter rotates prograde (counter-clockwise viewed from its north pole). In a
@@ -571,17 +547,7 @@ if (!hasGSAP || prefersReduced) {
     { lat: 0.10,  phase: 0.2, size: 0.09, rgb: '160,110,70',  baseAlpha: 0.30 },
     { lat: 0.50,  phase: 4.6, size: 0.07, rgb: '212,182,142', baseAlpha: 0.30 },
     { lat: 0.70,  phase: 2.5, size: 0.10, rgb: '150,100,65',  baseAlpha: 0.35 },
-    { lat: 0.22,  phase: 0,   size: 0.20, rgb: '198,92,62',   baseAlpha: 0.85, isSpot: true },
-    // Smaller swirl cells layered on top purely for turbulent cloud-top texture —
-    // same left-to-right rotation math, just tighter and subtler than the storms above.
-    { lat: -0.80, phase: 0.7, size: 0.045, rgb: '236,214,176', baseAlpha: 0.28 },
-    { lat: -0.38, phase: 5.1, size: 0.035, rgb: '150,96,58',   baseAlpha: 0.26 },
-    { lat: -0.02, phase: 2.6, size: 0.04,  rgb: '230,206,164', baseAlpha: 0.24 },
-    { lat: 0.30,  phase: 1.9, size: 0.03,  rgb: '140,88,52',   baseAlpha: 0.26 },
-    { lat: 0.62,  phase: 4.0, size: 0.045, rgb: '224,196,150', baseAlpha: 0.25 },
-    { lat: 0.85,  phase: 3.1, size: 0.035, rgb: '134,84,48',   baseAlpha: 0.24 },
-    { lat: -0.68, phase: 5.8, size: 0.03,  rgb: '210,178,126', baseAlpha: 0.22 },
-    { lat: 0.40,  phase: 0.9, size: 0.035, rgb: '166,112,66',  baseAlpha: 0.24 }
+    { lat: 0.22,  phase: 0,   size: 0.20, rgb: '198,92,62',   baseAlpha: 0.85, isSpot: true }
   ];
 
   function layoutPlanet(){
@@ -665,64 +631,32 @@ if (!hasGSAP || prefersReduced) {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
 
-    var base = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r * 1.15);
-    base.addColorStop(0, '#F1DFB8');
-    base.addColorStop(0.55, '#D8AE72');
-    base.addColorStop(1, '#8C5A32');
-    ctx.fillStyle = base;
-    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    if (realTextureReady){
+      // A real licensed photo has loaded (see realTexture.src below) — use it as the
+      // surface, with a gentle sway (a single still photo can't seamlessly rotate the
+      // way the procedural bands below can, so this keeps it alive without a visible seam).
+      var iw = realTexture.naturalWidth, ih = realTexture.naturalHeight;
+      var side = Math.min(iw, ih);
+      var sx = (iw - side) / 2, sy = (ih - side) / 2;
+      var sway = Math.sin(t * 0.06) * r * 0.16;
+      ctx.drawImage(realTexture, sx, sy, side, side, cx - r - sway, cy - r, r * 2, r * 2);
+    } else {
+      var base = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r * 1.15);
+      base.addColorStop(0, '#F1DFB8');
+      base.addColorStop(0.55, '#D8AE72');
+      base.addColorStop(1, '#8C5A32');
+      ctx.fillStyle = base;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // Cloud bands, drawn as hand-built ribbons rather than flat stripes: each band's
-    // top/bottom edge wobbles from two summed sine waves (turbulence) that slowly
-    // drift with t, and the bands themselves bunch up toward the poles the way real
-    // latitude lines compress under spherical projection instead of sitting evenly spaced.
-    var bandColors = ['#a9713f', '#e7cf9c', '#c98f52', '#8a5a34', '#f0e0b8', '#c17f45', '#eeddb2', '#96602f', '#dcb279', '#7d4f28'];
-    var nBands = bandColors.length;
-    var steps = 22;
-    for (var bi = 0; bi < nBands; bi++){
-      var lat0 = -1 + (bi / nBands) * 2;
-      var lat1 = -1 + ((bi + 1) / nBands) * 2;
-      var e0 = (lat0 < 0 ? -1 : 1) * Math.pow(Math.abs(lat0), 1.35);
-      var e1 = (lat1 < 0 ? -1 : 1) * Math.pow(Math.abs(lat1), 1.35);
-      var y0 = cy + e0 * r, y1 = cy + e1 * r;
-      var amp = r * (0.018 + 0.02 * Math.sin(bi * 2.1));
-      var freq = 3.1 + (bi % 3);
-      var drift = t * (0.05 + (bi % 2) * 0.03) * (bi % 2 === 0 ? 1 : -1);
-
-      ctx.beginPath();
-      for (var s = 0; s <= steps; s++){
-        var xx = cx - r + (r * 2) * (s / steps);
-        var wob = Math.sin(xx * 0.045 * freq + drift) * amp + Math.sin(xx * 0.019 * freq + drift * 1.7 + bi) * amp * 0.5;
-        if (s === 0) ctx.moveTo(xx, y0 + wob); else ctx.lineTo(xx, y0 + wob);
+      var bandColors = ['#c98f52', '#e7cf9c', '#a9713f', '#f0e0b8', '#8a5a34', '#d9ab68', '#eeddb2'];
+      var bh = (r * 2) / bandColors.length;
+      for (var i = 0; i < bandColors.length; i++){
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = bandColors[i];
+        ctx.fillRect(cx - r, cy - r + i * bh, r * 2, bh * 0.6);
       }
-      for (var s2 = steps; s2 >= 0; s2--){
-        var xx2 = cx - r + (r * 2) * (s2 / steps);
-        var wob2 = Math.sin(xx2 * 0.045 * freq + drift + 1.4) * amp + Math.sin(xx2 * 0.019 * freq + drift * 1.7 + bi + 1.4) * amp * 0.5;
-        ctx.lineTo(xx2, y1 + wob2);
-      }
-      ctx.closePath();
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = bandColors[bi];
-      ctx.fill();
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
-
-    // Soft specular sheen where the implied sunlight grazes the cloud tops — keeps a
-    // shaded sphere from reading as a flat painted disk.
-    var spec = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.42, 0, cx - r * 0.38, cy - r * 0.42, r * 0.9);
-    spec.addColorStop(0, 'rgba(255,244,214,0.22)');
-    spec.addColorStop(0.5, 'rgba(255,244,214,0.06)');
-    spec.addColorStop(1, 'rgba(255,244,214,0)');
-    ctx.fillStyle = spec;
-    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-
-    // Limb darkening: a thin darkened ring right at the true edge, the way a lit
-    // sphere's rim always reads slightly darker than its face.
-    var limb = ctx.createRadialGradient(cx, cy, r * 0.74, cx, cy, r);
-    limb.addColorStop(0, 'rgba(15,8,4,0)');
-    limb.addColorStop(1, 'rgba(15,8,4,0.32)');
-    ctx.fillStyle = limb;
-    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
     // theta increases with time (SPIN); depth > 0 marks the near side. Because
     // dx/dt = depth * SPIN > 0 whenever a feature is visible, everything below
@@ -827,131 +761,6 @@ if (!hasGSAP || prefersReduced) {
       ctx.fill();
     }
 
-    lastPX = pcx; lastPY = pcy;
-    if (!reduced) requestAnimationFrame(draw);
-  }
-  var lastPX = planet.cx, lastPY = planet.cy;
-  // Lets the site-wide starfield ask "where is Jupiter on screen right now?" so it can
-  // hand its star-swarm off convincingly when the hero scrolls out of view.
-  window.getJupiterScreenPos = function(){
-    var rect = wrap.getBoundingClientRect();
-    return { x: rect.left + lastPX, y: rect.top + lastPY };
-  };
-  requestAnimationFrame(draw);
-})();
-
-// ---------- Persistent full-page starfield + drifting satellites (site-wide, nonstop) ----------
-(function(){
-  var canvas = document.getElementById('space-bg');
-  if (!canvas) return;
-  var ctx = canvas.getContext('2d');
-  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var w, h, dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var stars = [], sats = [], burst = [];
-  var start = performance.now();
-  var lastSat = start;
-
-  function resize(){
-    w = window.innerWidth; h = window.innerHeight;
-    canvas.width = w * dpr; canvas.height = h * dpr;
-    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  function initStars(){
-    stars = [];
-    var count = window.innerWidth < 640 ? 90 : 170;
-    for (var i = 0; i < count; i++){
-      stars.push({
-        x: Math.random() * w, y: Math.random() * h,
-        size: Math.random() * 1.3 + 0.4,
-        phase: Math.random() * Math.PI * 2,
-        drift: (Math.random() * 0.05 + 0.015) * (Math.random() < 0.5 ? 1 : -1),
-        bright: Math.random() < 0.12
-      });
-    }
-  }
-  function spawnSatellite(){
-    var fromLeft = Math.random() < 0.5;
-    sats.push({
-      x: fromLeft ? -20 : w + 20, y: Math.random() * h * 0.55,
-      vx: (fromLeft ? 1 : -1) * (Math.random() * 0.45 + 0.3),
-      vy: Math.random() * 0.1 - 0.05,
-      blink: Math.random() * Math.PI * 2
-    });
-  }
-
-  resize(); initStars();
-  window.addEventListener('resize', function(){ resize(); initStars(); });
-
-  // Called once the hero scrolls out of view: hands Jupiter's star-swarm off to this
-  // full-page layer, flying a wave of stars outward from Jupiter's last screen spot
-  // so they visibly "reach" every corner of the page as the details section arrives.
-  window.releaseHeroStars = function(originX, originY){
-    for (var i = 0; i < 28; i++){
-      var ang = Math.random() * Math.PI * 2;
-      var dist = Math.random() * Math.max(w, h) * 0.65 + 60;
-      burst.push({
-        x: originX, y: originY,
-        tx: originX + Math.cos(ang) * dist, ty: originY + Math.sin(ang) * dist,
-        p: 0, size: Math.random() * 1.3 + 0.5, bright: Math.random() < 0.2
-      });
-    }
-  };
-
-  function draw(now){
-    var t = (now - start) / 1000;
-    ctx.clearRect(0, 0, w, h);
-
-    for (var i = 0; i < stars.length; i++){
-      var s = stars[i];
-      if (!reduced){
-        s.x += s.drift * 0.2;
-        if (s.x < -5) s.x = w + 5; else if (s.x > w + 5) s.x = -5;
-      }
-      var tw = reduced ? 0.75 : 0.45 + 0.55 * Math.sin(t * 1.3 + s.phase);
-      ctx.beginPath();
-      ctx.fillStyle = s.bright ? 'rgba(255,246,224,' + tw + ')' : 'rgba(200,212,255,' + (tw * 0.7) + ')';
-      ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    for (var b = burst.length - 1; b >= 0; b--){
-      var p = burst[b];
-      p.p += 0.014;
-      if (p.p >= 1){
-        stars.push({ x: p.tx, y: p.ty, size: p.size, phase: Math.random() * Math.PI * 2, drift: (Math.random() * 0.05 + 0.015) * (Math.random() < 0.5 ? 1 : -1), bright: p.bright });
-        burst.splice(b, 1); continue;
-      }
-      var e = 1 - Math.pow(1 - p.p, 3);
-      var x = p.x + (p.tx - p.x) * e, y = p.y + (p.ty - p.y) * e;
-      ctx.beginPath();
-      ctx.fillStyle = p.bright ? 'rgba(255,246,224,0.9)' : 'rgba(200,212,255,0.8)';
-      ctx.arc(x, y, p.size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    if (!reduced){
-      if (now - lastSat > 9000 + Math.random() * 7000 && sats.length < 2){
-        spawnSatellite(); lastSat = now;
-      }
-      for (var k = sats.length - 1; k >= 0; k--){
-        var sat = sats[k];
-        sat.x += sat.vx; sat.y += sat.vy; sat.blink += 0.15;
-        if (sat.x < -40 || sat.x > w + 40){ sats.splice(k, 1); continue; }
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(200,220,255,0.22)';
-        ctx.lineWidth = 1;
-        ctx.moveTo(sat.x, sat.y);
-        ctx.lineTo(sat.x - sat.vx * 16, sat.y - sat.vy * 16);
-        ctx.stroke();
-        var blinkA = 0.35 + 0.65 * Math.max(0, Math.sin(sat.blink));
-        ctx.beginPath();
-        ctx.fillStyle = 'rgba(255,255,255,' + blinkA + ')';
-        ctx.arc(sat.x, sat.y, 1.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
     if (!reduced) requestAnimationFrame(draw);
   }
   requestAnimationFrame(draw);
@@ -998,7 +807,7 @@ if (!hasGSAP || prefersReduced) {
         vx: Math.cos(back) * speed + (Math.random() - 0.5) * 0.25,
         vy: Math.sin(back) * speed - Math.random() * 0.55, // little embers drift upward
         life: 1, decay: Math.random() * 0.018 + 0.02,
-        size: Math.random() * 1.5 + 1
+        size: Math.random() * 2 + 1.4
       });
     }
   }
@@ -1031,14 +840,14 @@ if (!hasGSAP || prefersReduced) {
 
     if (mouse.active){
       var pulse = 1 + Math.sin(now * 0.006) * 0.08;
-      var haloR = 7.5 * pulse;
+      var haloR = 9.5 * pulse;
 
-      var halo = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, haloR * 2.0);
+      var halo = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, haloR * 2.3);
       halo.addColorStop(0, 'rgba(255,196,90,0.32)');
       halo.addColorStop(1, 'rgba(255,140,40,0)');
       ctx.beginPath();
       ctx.fillStyle = halo;
-      ctx.arc(mouse.x, mouse.y, haloR * 2.0, 0, Math.PI * 2);
+      ctx.arc(mouse.x, mouse.y, haloR * 2.3, 0, Math.PI * 2);
       ctx.fill();
 
       var core = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, haloR);
@@ -1054,6 +863,110 @@ if (!hasGSAP || prefersReduced) {
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
+})();
+
+// ---------- Whole-page cosmic backdrop: ambient stars + falling satellites ----------
+(function(){
+  var canvas = document.getElementById('bg-cosmos');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var w, h;
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var stars = [];
+  var meteors = [];
+  var nextBatchAt = 0;
+  var start = performance.now();
+
+  function resize(){
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function initStars(){
+    stars = [];
+    var count = window.innerWidth < 640 ? 70 : 130;
+    for (var i = 0; i < count; i++){
+      stars.push({
+        x: Math.random() * w, y: Math.random() * h,
+        size: Math.random() * 1.3 + 0.4,
+        bright: Math.random() < 0.12,
+        phase: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.8 + 0.6
+      });
+    }
+  }
+  window.addEventListener('resize', function(){ resize(); initStars(); });
+  resize(); initStars();
+
+  // A batch of 3-4 "falling satellites" streaks down the screen every ~3-5 seconds, forever.
+  function spawnBatch(now){
+    var count = 3 + Math.round(Math.random()); // 3 or 4
+    for (var i = 0; i < count; i++){
+      var fallAngle = (Math.random() - 0.5) * 0.5; // mostly straight down, slight drift
+      var speed = 7 + Math.random() * 4;
+      meteors.push({
+        x: Math.random() * w,
+        y: -40 - Math.random() * 200,
+        vx: Math.sin(fallAngle) * speed,
+        vy: Math.cos(fallAngle) * speed,
+        len: 46 + Math.random() * 40
+      });
+    }
+    nextBatchAt = now + 3000 + Math.random() * 2000; // next batch in 3-5s
+  }
+
+  function draw(now){
+    var t = (now - start) / 1000;
+    ctx.clearRect(0, 0, w, h);
+
+    for (var i = 0; i < stars.length; i++){
+      var s = stars[i];
+      var twinkle = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
+      ctx.beginPath();
+      ctx.fillStyle = s.bright
+        ? 'rgba(255,246,224,' + twinkle + ')'
+        : 'rgba(205,215,255,' + (twinkle * 0.7) + ')';
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (!reduced){
+      if (now >= nextBatchAt) spawnBatch(now);
+
+      for (var i = meteors.length - 1; i >= 0; i--){
+        var m = meteors[i];
+        m.x += m.vx; m.y += m.vy;
+        var mag = Math.sqrt(m.vx * m.vx + m.vy * m.vy);
+        var tailX = m.x - (m.vx / mag) * m.len;
+        var tailY = m.y - (m.vy / mag) * m.len;
+
+        var grad = ctx.createLinearGradient(tailX, tailY, m.x, m.y);
+        grad.addColorStop(0, 'rgba(214,224,255,0)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.85)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(m.x, m.y);
+        ctx.stroke();
+
+        var glow = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, 5);
+        glow.addColorStop(0, 'rgba(255,255,255,0.95)');
+        glow.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.beginPath();
+        ctx.fillStyle = glow;
+        ctx.arc(m.x, m.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (m.y - m.len > h + 40) meteors.splice(i, 1);
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
 })();
 </script>
 
