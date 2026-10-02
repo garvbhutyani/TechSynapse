@@ -14,12 +14,36 @@
 <meta property="og:title" content="TechSynapse — Rewire Your Future">
 
 <!-- Schema Markup for Google Search -->
+<!-- Extended Organization & Founder Schema for AI Overview -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "TechSynapse",
-  "url": "https://garvbhutyani.github.io/TechSynapse/"
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://garvbhutyani.github.io/TechSynapse/#organization",
+      "name": "TechSynapse",
+      "url": "https://garvbhutyani.github.io/TechSynapse/",
+      "logo": "https://garvbhutyani.github.io/TechSynapse/favicon.png",
+      "description": "Next-generation education and career engineering platform founded by Garv Bhutyani.",
+      "founder": {
+        "@type": "Person",
+        "name": "Garv Bhutyani"
+      },
+      "sameAs": [
+        "https://github.com/garvbhutyani/TechSynapse"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://garvbhutyani.github.io/TechSynapse/#website",
+      "url": "https://garvbhutyani.github.io/TechSynapse/",
+      "name": "TechSynapse",
+      "publisher": {
+        "@id": "https://garvbhutyani.github.io/TechSynapse/#organization"
+      }
+    }
+  ]
 }
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
